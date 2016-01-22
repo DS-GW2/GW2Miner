@@ -13,6 +13,7 @@ namespace GW2Miner
     static class Program
     {
         static TradeWorker trader = new TradeWorker();
+        static bool auto = false;
 
 
         static void ProcessMyBuys()
@@ -49,10 +50,11 @@ namespace GW2Miner
                 {
                     Console.WriteLine("{0}: {1} is not worth({2}) the price({3}) you are bidding for anymore.", item.ListingId, item.Name, worth, item.UnitPrice);
                     Console.WriteLine("Do you want to cancel this bid?");
-                    ConsoleKeyInfo key = Console.ReadKey(true);
-                    if (key.KeyChar == 'y')
+                    ConsoleKeyInfo key = new ConsoleKeyInfo();
+                    if (!auto) key = Console.ReadKey(true);
+                    if (key.KeyChar == 'y' || auto)
                     {
-                        trader.cancelBuyOrder(item.Id, item.ListingId);
+                        trader.cancelBuyOrder(item.Id, item.ListingId).Wait();
                         continue;
                     }
                 }
@@ -88,10 +90,11 @@ namespace GW2Miner
                     }
 
                     Console.WriteLine("Do you want to outbid this listing? (y/n)");
-                    ConsoleKeyInfo key = Console.ReadKey(true);
-                    if (key.KeyChar == 'y')
+                    ConsoleKeyInfo key = new ConsoleKeyInfo();
+                    if (!auto) key = Console.ReadKey(true);
+                    if (key.KeyChar == 'y' || auto)
                     {
-                        if (breakEvenPrice <= item.UnitPrice)
+                        if ((breakEvenPrice - 1) <= item.UnitPrice)
                         {
                             // Not possible to up my bid with that kind of sell price
                             Console.WriteLine("Not possible to up my bid!  You need a sell price of {0} to earn a profit.", (int)Math.Ceiling((item.UnitPrice + 1) / 0.85));
@@ -109,8 +112,9 @@ namespace GW2Miner
                                 item.ListingId, item.Name, item.UnitPrice, listing.PricePerUnit, listing.NumberAvailable,
                                         item.Quantity, (int)Math.Floor((item.MinSaleUnitPrice - 1) * 0.85), item.MinSaleUnitPrice - 1);
                     Console.WriteLine("Do you want to lower your bid? (y/n)");
-                    ConsoleKeyInfo key = Console.ReadKey(true);
-                    if (key.KeyChar == 'y')
+                    ConsoleKeyInfo key = new ConsoleKeyInfo();
+                    if (!auto) key = Console.ReadKey(true);
+                    if (key.KeyChar == 'y' || auto)
                     {
                         trader.RenewBuyOrder(item, listing.PricePerUnit + 1);
                     }
@@ -156,8 +160,9 @@ namespace GW2Miner
                                     Console.WriteLine("Ridiculous undercut {0}: My Price = {1} Profit = {2} Cost to rectify = {3}", item.Name,
                                             item.UnitPrice, profit, sum);
                                     Console.WriteLine("Do you want to buy them up? (y/n)");
-                                    ConsoleKeyInfo key = Console.ReadKey(true);
-                                    if (key.KeyChar == 'y')
+                                    ConsoleKeyInfo key = new ConsoleKeyInfo();
+                                    if (!auto) key = Console.ReadKey(true);
+                                    if (key.KeyChar == 'y' || auto)
                                     {
                                         trader.BuyAllRidiculousSellOrders(itemSellListing.Result, item);
                                     }
@@ -228,9 +233,27 @@ namespace GW2Miner
 
             try
             {
+                if (args.Length > 0)
+                {
+                    Console.WriteLine("Activating Automatic mode...");
+                    auto = true;
+                }
+
                 trader.UseGW2SpidyForCraftingCost = false;
-                ProcessMyBuys();
-                ProcessMySells();
+                do
+                {
+                    ProcessMyBuys();
+                    if (auto)
+                    {
+                        Console.WriteLine("Sleeping for 5 seconds...");
+                        Thread.Sleep(5000);
+                    }
+                    else
+                    {
+                        ProcessMySells();
+                    }
+                }
+                while (auto);
             }
             catch (Exception e)
             {
